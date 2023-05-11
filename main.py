@@ -44,33 +44,13 @@ if sentbytes  > 0:
 time.sleep(0.2)
 read_shell(shell)
 
-sentbytes = shell.send('whoami\n')
-if sentbytes  > 0:
-    print("whoami send")
-time.sleep(0.2)
-read_shell(shell)
-
-
-
-# shell.send('stty -ocrnl\n')
+# sentbytes = shell.send('whoami\n')
+# if sentbytes  > 0:
+#     print("whoami send")
 # time.sleep(0.2)
 # read_shell(shell)
 
-# shell.send('stty -onlcr\n')
-# time.sleep(0.2)
-# read_shell(shell)
 
-# shell.send('stty -opost\n')
-# time.sleep(0.2)
-# read_shell(shell)
-
-# shell.send('echo $TERM\n')
-# time.sleep(0.2)
-# read_shell(shell)
-
-# shell.send('stty -e\n')
-# time.sleep(0.2)
-# read_shell(shell)
 
 shell.send("TcBackup.sh --disk /dev/ada0 2> /home/Administrator/error.log | uuencode -m -r /dev/stdout\n")
 time.sleep(0.2)
@@ -80,25 +60,63 @@ time.sleep(1)
 bytes_read = 0
 
 # Write Base 64 encoded stream
+# Das Funktioniert
+# with open(backup_name, 'wb') as f:
+#     while shell.recv_ready():
+#         _bytes = shell.recv(chunc)
+#         #print(' '.join('{:02x}'.format(x) for x in _bytes[0:20]))
+#         bytes_read += len(_bytes)
+#         print('read {}'.format(size(bytes_read)), end='\r')
+#         f.write(_bytes)
+#         time.sleep(0.3)
+
+lastline = ''
+i = 0
+
+size_written = 0
+
 with open(backup_name, 'wb') as f:
-    while shell.recv_ready():
-        _bytes = shell.recv(chunc)
+    while shell.recv_ready(): 
+        b64_lines = shell.recv(chunc).decode('ASCII').splitlines(keepends=True)
+
+        
+
+        if lastline != '':
+            b64_lines[0] = lastline +  b64_lines[0]
+
+        
+        if '\n' in b64_lines[-1:]: # if the last line is not chopped
+            lastline = ''
+        else:
+            lastline = b64_lines.pop() # keep the remaining strin for next iteration
+        i += 1
+
+
+        for b64_line in b64_lines:
+            decoded = base64.b64decode(b64_line)
+            size_written += len(decoded)
+            f.write(decoded)
+        # todo: writelines
+        print('Backup written {}'.format(size(size_written)), end='\r')
         #print(' '.join('{:02x}'.format(x) for x in _bytes[0:20]))
-        bytes_read += len(_bytes)
-        print('read {}'.format(size(bytes_read)))
-        f.write(_bytes)
-        time.sleep(0.3)
+        # print(' '.join('{:02x}'.format(x) for x in _bytes))
+        # bytes_read += len(_bytes)
+        # print('read {}'.format(size(bytes_read)), end='\r')
+        # f.write(_bytes)
+        # if i == 2:
+        #     k = 5
+        time.sleep(0.5)
 
 # Decode file
 
-with open(backup_name, 'rb') as input_file:
-    with open(backup_decoded_name, 'wb') as output_file:
-        while (line := input_file.readline()) != b'':
-            try:
-                decoded = base64.b64decode(line)
-                output_file.write(decoded)
-            except binascii.Error:
-                pass
+# with open(backup_name, 'rb') as input_file:
+#     with open(backup_decoded_name, 'wb') as output_file:
+#         while (line := input_file.readline()) != b'':
+#             try:
+#                 decoded = base64.b64decode(line)
+#                 output_file.write(decoded)
+#             except binascii.Error:
+#                 pass
 
 print('>>> BACKUP COMPLETE <<<')
 

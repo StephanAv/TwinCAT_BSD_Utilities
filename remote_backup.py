@@ -88,7 +88,7 @@ if 'root' in ret:
     print('>>> Root rights granted')
 else:
     print('Root rights not granted, cannot start backup - EXIT')
-
+    sys.exit()
 
 print('Receiving backup stream...')
 shell.send("TcBackup.sh --disk /dev/ada0 2> /home/Administrator/error.log | uuencode -m -r /dev/stdout\n")

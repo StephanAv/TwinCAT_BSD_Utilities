@@ -1,54 +1,84 @@
+import sys, time, base64, itertools, paramiko
 from pathlib import Path
-from hurry.filesize import size
-import paramiko
-import time
-import binascii
-import base64
 
+addr = '192.168.1.121'
+user = 'Administrator'
+password = '1'
+file_path = Path.home() / 'Downloads' / 'twincat_bsd_backup.tcbkp00'
+
+t = len(sys.argv)
+
+# Process command line arguments in the following order
+#
+# 1. Address
+# 2. Backup file path
+# 3. Password
+# 4. User
+
+if len(sys.argv) < 2:
+    print(r'At least target address required! file path, password and username are optional')
+    print(r'Example: remote_backup.py 192.168.1.98 C:\Users\StephanA\Downloads\mybackup.tcbkp00 1 Administrator')
+    sys.exit()
+
+if len(sys.argv) > 2:
+    try:
+        file_path = sys.argv[2]
+    except:
+        pass
+    
+    try:
+        password = sys.argv[3]
+    except:
+        pass
+
+    try:
+        user = sys.argv[4]
+    except:
+        pass
+
+print('Starting backup....')
+print('Target address: {}'.format(addr))
+print('Backup file path: {}'.format(file_path))
+print('User: {}'.format(user))
+print('Password: {}'.format(password))
 
 chunc = 2 ** 20
-backup_name = Path.home() / 'Downloads' / 'backup_x.tcbkp00'
-backup_decoded_name = Path.home() / 'Downloads' / 'backup_decoded.tcbkp00'
+megybyte = float(1024**2)
+spinner = itertools.cycle(['-', '\\', '|', '/'])
 
 def read_shell(shell : paramiko.Channel):
     if shell.recv_ready():
         recvBytes = shell.recv(50000)
-        for line in recvBytes.decode('utf8').splitlines():
-            print(line)
+        return recvBytes.decode('utf8')
 
-# with open(backup_name, 'wb') as f:
-#     #process = subprocess.Popen("ssh root@192.168.1.90 \" sh -c 'TcBackup.sh --disk /dev/ada0'\"", stdout=subprocess.PIPE)
-#     #process = subprocess.Popen("ssh -t Administrator@192.168.1.121 'doas TcBackup.sh --disk /dev/ada0'", stdout=subprocess.PIPE)
-#     process = subprocess.Popen("ssh -t Administrator@192.168.1.121 \"doas sh -c '/usr/local/bin/TcBackup.sh --disk /dev/ada0'\"", stdout=subprocess.PIPE)
-#     for c in iter(lambda: process.stdout.read(chunc), b""):
-#         f.write(c)
+
+
         
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
-client.connect('192.168.1.121', username='Administrator', password='1')
-#stdin, stdout, stderr = client.exec_command("doas -S")
+client.connect(addr, username=user, password=password)
 shell = client.invoke_shell()
 
 sentbytes = shell.send('doas -S\n')
 if sentbytes  > 0:
-    print("root mode requested")
+    print(">>> root rights requested")
 
 time.sleep(0.2)
 read_shell(shell)
 
 
-sentbytes = shell.send('1\n')
+sentbytes = shell.send('{}\n'.format(password))
 if sentbytes  > 0:
     print("password send")
 
 time.sleep(0.2)
 read_shell(shell)
 
-# sentbytes = shell.send('whoami\n')
-# if sentbytes  > 0:
-#     print("whoami send")
-# time.sleep(0.2)
-# read_shell(shell)
+sentbytes = shell.send('whoami\n')
+if sentbytes  > 0:
+    print("whoami send")
+time.sleep(0.2)
+zz = read_shell(shell)
 
 
 
@@ -70,16 +100,18 @@ bytes_read = 0
 #         f.write(_bytes)
 #         time.sleep(0.3)
 
+
+
+
 lastline = ''
 i = 0
+mb_received = 0
 
-size_written = 0
-
-with open(backup_name, 'wb') as f:
+with open(file_path, 'wb') as f:
     while shell.recv_ready(): 
         b64_lines = shell.recv(chunc).decode('ASCII').splitlines(keepends=True)
 
-        
+        mb_received += float(sum([len(i) for i in b64_lines]) / megybyte)
 
         if lastline != '':
             b64_lines[0] = lastline +  b64_lines[0]
@@ -91,13 +123,12 @@ with open(backup_name, 'wb') as f:
             lastline = b64_lines.pop() # keep the remaining strin for next iteration
         i += 1
 
+        f.writelines(list(map(base64.b64decode, b64_lines)))
 
-        for b64_line in b64_lines:
-            decoded = base64.b64decode(b64_line)
-            size_written += len(decoded)
-            f.write(decoded)
+
+
         # todo: writelines
-        print('Backup written {}'.format(size(size_written)), end='\r')
+        print('[{}] - Backup {:6.2f} MB received  '.format(next(spinner), mb_received), end='\r')
         #print(' '.join('{:02x}'.format(x) for x in _bytes[0:20]))
         # print(' '.join('{:02x}'.format(x) for x in _bytes))
         # bytes_read += len(_bytes)
@@ -105,7 +136,7 @@ with open(backup_name, 'wb') as f:
         # f.write(_bytes)
         # if i == 2:
         #     k = 5
-        time.sleep(0.5)
+        time.sleep(1)
 
 # Decode file
 

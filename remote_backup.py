@@ -20,6 +20,8 @@ if len(sys.argv) < 2:
     print(r'Example: remote_backup.py 192.168.1.98 C:\Users\StephanA\Downloads\mybackup.tcbkp00 1 Administrator')
     sys.exit()
 
+addr = sys.argv[1]
+
 if len(sys.argv) > 2:
     try:
         file_path = sys.argv[2]

@@ -36,80 +36,73 @@ if len(sys.argv) > 2:
     except:
         pass
 
-print('Starting backup....')
-print('Target address: {}'.format(addr))
-print('Backup file path: {}'.format(file_path))
-print('User: {}'.format(user))
-print('Password: {}'.format(password))
-
-chunc = 2 ** 20
-megybyte = float(1024**2)
-spinner = itertools.cycle(['-', '\\', '|', '/'])
-
 def read_shell(shell : paramiko.Channel):
     if shell.recv_ready():
         recvBytes = shell.recv(50000)
         return recvBytes.decode('utf8')
 
+chunc = 2 ** 20 # Bytes
+megybyte = float(1024**2) # MB
+spinner = itertools.cycle(['-', '\\', '|', '/'])
+read_delay = 0.5 # Seconds
+stream_delay = 1.0 # Seconds
 
+print('Target address: {}'.format(addr))
+print('Backup file path: {}'.format(file_path))
+print('User: {}'.format(user))
+print('Password: {}'.format(password))
 
-        
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
-client.connect(addr, username=user, password=password)
-shell = client.invoke_shell()
+try:
+    client.connect(addr, username=user, password=password)
+    shell = client.invoke_shell()
+except Exception as e:
+    print('SSH connection failed: {}'.format(str(e)))
+    sys.exit()
 
 sentbytes = shell.send('doas -S\n')
 if sentbytes  > 0:
-    print(">>> root rights requested")
+    print("Root shell requested")
 
-time.sleep(0.2)
+time.sleep(read_delay)
 read_shell(shell)
 
 
 sentbytes = shell.send('{}\n'.format(password))
 if sentbytes  > 0:
-    print("password send")
+    print("Password send")
 
-time.sleep(0.2)
+time.sleep(read_delay)
 read_shell(shell)
 
 sentbytes = shell.send('whoami\n')
 if sentbytes  > 0:
-    print("whoami send")
-time.sleep(0.2)
-zz = read_shell(shell)
+    print("Cheking root rights")
+time.sleep(read_delay)
+ret = read_shell(shell)
+
+if 'root' in ret:
+    print('>>> Root rights granted')
+else:
+    print('Root rights not granted, cannot start backup - EXIT')
 
 
-
+print('Receiving backup stream...')
 shell.send("TcBackup.sh --disk /dev/ada0 2> /home/Administrator/error.log | uuencode -m -r /dev/stdout\n")
-time.sleep(0.2)
-read_shell(shell)
-
-time.sleep(1)
-bytes_read = 0
-
-# Write Base 64 encoded stream
-# Das Funktioniert
-# with open(backup_name, 'wb') as f:
-#     while shell.recv_ready():
-#         _bytes = shell.recv(chunc)
-#         #print(' '.join('{:02x}'.format(x) for x in _bytes[0:20]))
-#         bytes_read += len(_bytes)
-#         print('read {}'.format(size(bytes_read)), end='\r')
-#         f.write(_bytes)
-#         time.sleep(0.3)
-
-
-
+time.sleep(read_delay)
 
 lastline = ''
-i = 0
+bFirstIter = True
 mb_received = 0
 
 with open(file_path, 'wb') as f:
     while shell.recv_ready(): 
         b64_lines = shell.recv(chunc).decode('ASCII').splitlines(keepends=True)
+
+        if bFirstIter:
+            b64_lines.pop(0)
+            bFirstIter = False
 
         mb_received += float(sum([len(i) for i in b64_lines]) / megybyte)
 
@@ -121,34 +114,12 @@ with open(file_path, 'wb') as f:
             lastline = ''
         else:
             lastline = b64_lines.pop() # keep the remaining strin for next iteration
-        i += 1
 
         f.writelines(list(map(base64.b64decode, b64_lines)))
 
-
-
-        # todo: writelines
         print('[{}] - Backup {:6.2f} MB received  '.format(next(spinner), mb_received), end='\r')
-        #print(' '.join('{:02x}'.format(x) for x in _bytes[0:20]))
-        # print(' '.join('{:02x}'.format(x) for x in _bytes))
-        # bytes_read += len(_bytes)
-        # print('read {}'.format(size(bytes_read)), end='\r')
-        # f.write(_bytes)
-        # if i == 2:
-        #     k = 5
-        time.sleep(1)
+        time.sleep(stream_delay)
 
-# Decode file
-
-# with open(backup_name, 'rb') as input_file:
-#     with open(backup_decoded_name, 'wb') as output_file:
-#         while (line := input_file.readline()) != b'':
-#             try:
-#                 decoded = base64.b64decode(line)
-#                 output_file.write(decoded)
-#             except binascii.Error:
-#                 pass
-
-print('>>> BACKUP COMPLETE <<<')
+print('>>>>> BACKUP COMPLETE <<<<<')
 
 client.close()

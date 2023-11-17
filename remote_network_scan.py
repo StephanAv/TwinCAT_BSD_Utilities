@@ -1,5 +1,5 @@
 # Title:        Remote Network Scan
-# Description:  Perform a remote network scan based on NBTSCAN
+# Description:  Perform a remote network scan based on ARP or NBTSCAN
 # Requirements: Python3 with paramiko module installed
 # Author:       Stephan Avenwedde
 # Copyright:    Beckhoff Automation Gmbh & Co. KG
@@ -89,8 +89,8 @@ except Exception as e:
 
 while True:
     os.system('cls')
-    #print('\n'.join(get_devices_from_arp(client))) # Read ARP table -> alternative approach, no scan
-    print(get_devices_from_nbtscan(client))
+    print('\n'.join(get_devices_from_arp(client))) # Read ARP table -> alternative approach, no scan
+    #print(get_devices_from_nbtscan(client))
     i = input("Press Enter to refresh, any other key to quit...")
     if i:
         break

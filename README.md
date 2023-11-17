@@ -62,3 +62,23 @@ python remote_config.py 172.17.40.30 Administrator 1 test.sh
 ```
 
 The test.sh script should be a configuration script which will be executed on the remote system.
+
+## Remote Network Scan ([remote_network_scan.py](/remote_network_scan.py))
+
+Print a list of remote network targets for which there is a entry in the arp table.
+
+#### Requirements
+
+- [Python 3.6](https://www.python.org/) or newer
+- [Paramiko](https://pypi.org/project/paramiko/)
+
+#### Examples
+
+```bash
+python remote_network_scan.py 192.168.1.98 Administrator 1 igb0
+```
+
+
+
+   
+
